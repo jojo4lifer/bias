@@ -2,14 +2,6 @@ import WidgetKit
 import SwiftUI
 import BiasCore
 
-struct DailyQuoteEntry: TimelineEntry {
-    let date: Date
-    let quote: Quote?
-    let groupName: String
-    let theme: ThemeSpec
-    let language: AppLanguage
-}
-
 /// Builds a 10-day timeline in one go.
 ///
 /// WidgetKit's refresh budget is not guaranteed, so nothing here waits for a refresh to show the
@@ -20,15 +12,15 @@ struct DailyQuoteProvider: TimelineProvider {
     private let theme = ThemeCatalog.default
     private let language: AppLanguage = .en
 
-    func placeholder(in context: Context) -> DailyQuoteEntry {
-        DailyQuoteEntry(date: Date(), quote: nil, groupName: "", theme: theme, language: language)
+    func placeholder(in context: Context) -> QuoteWidgetEntry {
+        QuoteWidgetEntry.empty
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (DailyQuoteEntry) -> Void) {
+    func getSnapshot(in context: Context, completion: @escaping (QuoteWidgetEntry) -> Void) {
         completion(entry(for: Date()))
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<DailyQuoteEntry>) -> Void) {
+    func getTimeline(in context: Context, completion: @escaping (Timeline<QuoteWidgetEntry>) -> Void) {
         let now = Date()
         guard let groupId = repository.firstGroupId else {
             completion(Timeline(entries: [entry(for: now)], policy: .after(now.addingTimeInterval(3600))))
@@ -43,7 +35,7 @@ struct DailyQuoteProvider: TimelineProvider {
 
         let groupName = repository.store.group(for: groupId)?.name.resolve(language) ?? ""
         let entries = upcoming.map { item in
-            DailyQuoteEntry(
+            QuoteWidgetEntry(
                 date: item.day,
                 quote: item.quote,
                 groupName: groupName,
@@ -54,13 +46,19 @@ struct DailyQuoteProvider: TimelineProvider {
         completion(Timeline(entries: entries, policy: .atEnd))
     }
 
-    private func entry(for date: Date) -> DailyQuoteEntry {
+    private func entry(for date: Date) -> QuoteWidgetEntry {
         guard let groupId = repository.firstGroupId else {
-            return DailyQuoteEntry(date: date, quote: nil, groupName: "", theme: theme, language: language)
+            return QuoteWidgetEntry(
+                date: date,
+                quote: nil,
+                groupName: "",
+                theme: theme,
+                language: language
+            )
         }
         let quote = repository.store.quote(for: groupId, date: date)
         let groupName = repository.store.group(for: groupId)?.name.resolve(language) ?? ""
-        return DailyQuoteEntry(
+        return QuoteWidgetEntry(
             date: date,
             quote: quote,
             groupName: groupName,

@@ -67,3 +67,36 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             CODE_SIGNING_ALLOWED=NO \
             build
+
+      # There is no Mac here, so CI takes the pictures. Download them with:
+      #   gh run download <run-id> -n screenshots
+      - name: Screenshot the app and widget preview
+        run: |
+          APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products/Debug-iphonesimulator" \
+            -maxdepth 1 -name "BiasApp.app" -print -quit)
+          echo "app: $APP"
+
+          UDID=$(xcrun simctl list devices available -j | python3 -c \
+            "import json,sys;d=json.load(sys.stdin)['devices'];print(next(x['udid'] for v in d.values() for x in v if x['name'].startswith('iPhone')))")
+          echo "simulator: $UDID"
+
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl install "$UDID" "$APP"
+
+          mkdir -p artifacts
+          xcrun simctl launch "$UDID" com.example.bias
+          sleep 5
+          xcrun simctl io "$UDID" screenshot artifacts/today.png
+
+          xcrun simctl terminate "$UDID" com.example.bias || true
+          xcrun simctl launch "$UDID" com.example.bias -widgetPreview YES
+          sleep 5
+          xcrun simctl io "$UDID" screenshot artifacts/widgets.png
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: artifacts/*.png
+          if-no-files-found: warn
