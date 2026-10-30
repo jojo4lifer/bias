@@ -359,6 +359,94 @@ public enum SelfChecks {
             return nil
         }
 
+        // MARK: CSV
+
+        check("csv: parses quoted commas, embedded newlines and doubled quotes") {
+            let text = "id,text_en\n1,\"Hello, world\"\n2,\"Line one\nline two\"\n3,\"She said \"\"hi\"\"\"\n"
+            let table = CSV.parse(text)
+            try expect(table.rows.count == 3, "got \(table.rows.count) rows")
+            try expect(table.value("text_en", in: table.rows[0]) == "Hello, world", "quoted comma")
+            try expect(table.value("text_en", in: table.rows[1]) == "Line one\nline two", "embedded newline")
+            try expect(table.value("text_en", in: table.rows[2]) == "She said \"hi\"", "doubled quote")
+            return nil
+        }
+
+        check("csv: header names are normalised") {
+            let table = CSV.parse("Group ID,Text EN, source-date\nbts,x,2021-01-01\n")
+            try expect(table.has("group_id"), "Group ID not normalised")
+            try expect(table.has("text_en"), "Text EN not normalised")
+            try expect(table.has("source_date"), "source-date not normalised")
+            return nil
+        }
+
+        check("csv: tolerates a BOM and CRLF line endings") {
+            let table = CSV.parse("\u{FEFF}id,name\r\n1,one\r\n2,two\r\n")
+            try expect(table.header == ["id", "name"], "header \(table.header)")
+            try expect(table.rows.count == 2, "got \(table.rows.count) rows")
+            try expect(table.rows[1][1] == "two", "got \(table.rows[1])")
+            return nil
+        }
+
+        check("csv: encode then parse round-trips awkward values") {
+            let rows = [["a,b", "he said \"no\"", "line1\nline2", " padded "]]
+            let encoded = CSV.encode(header: ["one", "two", "three", "four"], rows: rows)
+            let parsed = CSV.parse(encoded)
+            try expect(parsed.rows.count == 1, "lost a row")
+            try expect(parsed.rows[0].prefix(3) == rows[0].prefix(3), "round trip mismatch: \(parsed.rows[0])")
+            return nil
+        }
+
+        // MARK: Importer
+
+        check("importer: template CSVs produce a usable database") {
+            let result = QuoteCSVImporter.build(
+                groupsCSV: QuoteCSVImporter.templateGroupsCSV(),
+                quotesCSV: QuoteCSVImporter.templateQuotesCSV(),
+                version: 1,
+                generatedAt: "2026-10-31"
+            )
+            try expect(!result.hasErrors, "errors: \(result.issues.map(\.description))")
+            try expect(result.database.groups.count == 1, "groups \(result.database.groups.count)")
+            try expect(result.database.quotes.count == 1, "quotes \(result.database.quotes.count)")
+            let quote = try unwrap(result.database.quotes.first, "quote")
+            try expect(quote.text.en.hasPrefix("PLACEHOLDER"), "text")
+            try expect(quote.tags == ["comfort", "nostalgia"], "tags \(quote.tags)")
+            try expect(quote.verified, "verified flag")
+            try expect(!quote.retired, "retired flag")
+            try expect(quote.source.date == "2021-05-21", "date \(quote.source.date)")
+            return nil
+        }
+
+        check("importer: date shapes a spreadsheet produces") {
+            try expect(QuoteCSVImporter.normalizeDate("2021-05-21") == "2021-05-21", "iso")
+            try expect(QuoteCSVImporter.normalizeDate("2021/05/21") == "2021-05-21", "slash")
+            try expect(QuoteCSVImporter.normalizeDate("2021.5.21") == "2021-05-21", "dot, unpadded")
+            try expect(QuoteCSVImporter.normalizeDate("20210521") == "2021-05-21", "compact")
+            try expect(QuoteCSVImporter.normalizeDate("21/05/2021") == nil, "ambiguous dmy accepted")
+            try expect(QuoteCSVImporter.normalizeDate("May 21, 2021") == nil, "prose accepted")
+            return nil
+        }
+
+        check("importer: unknown group is an error, not a silent drop") {
+            let groups = CSV.encode(header: ["id", "name_en"], rows: [["bts", "BTS"]])
+            let quotes = CSV.encode(
+                header: ["id", "group_id", "member_id", "text_en", "source_title", "source_date"],
+                rows: [["x-1", "nope", "m", "text", "Live", "2021-05-21"]]
+            )
+            let result = QuoteCSVImporter.build(groupsCSV: groups, quotesCSV: quotes)
+            try expect(result.hasErrors, "unknown group was accepted")
+            return nil
+        }
+
+        check("importer: tags split on semicolons and commas") {
+            try expect(
+                QuoteCSVImporter.parseTags("comfort; hype,nostalgia、funny") == ["comfort", "hype", "nostalgia", "funny"],
+                "tag parsing"
+            )
+            try expect(QuoteCSVImporter.parseTags(nil).isEmpty, "nil tags")
+            return nil
+        }
+
         return results
     }
 

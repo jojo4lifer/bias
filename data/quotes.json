@@ -1,0 +1,50 @@
+{
+  "groups" : [
+    {
+      "accent" : "#7B5CFA",
+      "debut" : 2013,
+      "id" : "group-a",
+      "name" : {
+        "en" : "Group A",
+        "zhHans" : "组合甲",
+        "zhHant" : "組合甲"
+      }
+    }
+  ],
+  "quotes" : [
+    {
+      "context" : {
+        "en" : "Said during a livestream.",
+        "zhHans" : "在直播中提到。"
+      },
+      "groupId" : "group-a",
+      "id" : "sample-group-a-m1-0001",
+      "lang" : "ko",
+      "memberId" : "m1",
+      "memberName" : {
+        "en" : "Member One",
+        "zhHans" : "成员一"
+      },
+      "retired" : false,
+      "shortText" : {
+        "en" : "PLACEHOLDER — short version.",
+        "zhHans" : "占位短句。"
+      },
+      "source" : {
+        "date" : "2021-05-21",
+        "title" : "Weverse Live",
+        "url" : "https://example.com/placeholder"
+      },
+      "tags" : [
+        "comfort",
+        "nostalgia"
+      ],
+      "text" : {
+        "en" : "PLACEHOLDER — a fake quote used to show the shape of a row. Delete this row.",
+        "zhHans" : "占位文字 — 用来展示一行的格式，请删除。"
+      },
+      "verified" : true
+    }
+  ],
+  "version" : 1
+}

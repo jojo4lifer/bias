@@ -11,6 +11,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD="$ROOT/.localbuild"
+LINT="$BUILD/quotelint"
 
 rm -rf "$BUILD"
 mkdir -p "$BUILD/src"
@@ -20,23 +21,43 @@ cp "$ROOT"/Sources/BiasCore/*.swift "$BUILD/src/"
 sed 's/^import BiasCore$//' "$ROOT/Sources/QuoteLint/main.swift" > "$BUILD/src/main.swift"
 
 echo "compiling…"
-swiftc -O -o "$BUILD/quotelint" "$BUILD"/src/*.swift
+swiftc -O -o "$LINT" "$BUILD"/src/*.swift
 
 echo
-echo "self-checks"
-"$BUILD/quotelint" --self-check
+echo "── self-checks ──"
+"$LINT" self-check
 
 echo
-echo "sample data (development mode — placeholders are allowed here)"
-"$BUILD/quotelint" "$ROOT/data/quotes.sample.json" --mode development --stats
+echo "── build quotes.json from CSV ──"
+cd "$ROOT"
+"$LINT" build \
+  --groups data/groups.csv \
+  --quotes data/quotes.csv \
+  --out "$BUILD/quotes.build.json" \
+  --mode development \
+  --min 1
 
 echo
-echo "sample data in shipping mode (must fail: placeholders present)"
-if "$BUILD/quotelint" "$ROOT/data/quotes.sample.json" --mode shipping > /dev/null; then
+echo "── validate the generated file ──"
+"$LINT" "$BUILD/quotes.build.json" --mode development --min 1
+
+echo
+echo "── build output must match the committed JSON ──"
+if diff -q data/quotes.json "$BUILD/quotes.build.json" > /dev/null; then
+  echo "ok: data/quotes.json is up to date with data/quotes.csv"
+else
+  echo "FAIL: data/quotes.json is stale — run: quotelint build"
+  diff data/quotes.json "$BUILD/quotes.build.json" | head -20 || true
+  exit 1
+fi
+
+echo
+echo "── placeholder data must be refused in shipping mode ──"
+if "$LINT" data/quotes.json --mode shipping > /dev/null 2>&1; then
   echo "FAIL: placeholder data passed shipping validation"
   exit 1
 else
-  echo "ok: placeholder data correctly refused in shipping mode"
+  echo "ok: placeholders are blocked from shipping"
 fi
 
 echo

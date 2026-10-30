@@ -1,0 +1,2 @@
+id,group_id,member_id,member_en,member_zh,member_zh_hant,text_en,text_zh,text_zh_hant,short_en,short_zh,short_zh_hant,context_en,context_zh,context_zh_hant,source_title,source_date,source_url,lang,tags,verified,retired,notes
+sample-group-a-m1-0001,group-a,m1,Member One,成员一,,PLACEHOLDER — a fake quote used to show the shape of a row. Delete this row.,占位文字 — 用来展示一行的格式，请删除。,,PLACEHOLDER — short version.,占位短句。,,Said during a livestream.,在直播中提到。,,Weverse Live,2021-05-21,https://example.com/placeholder,ko,comfort; nostalgia,TRUE,FALSE,delete me

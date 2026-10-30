@@ -1,36 +1,95 @@
 # Content data
 
-## Files
+**The CSV is the source of truth. `quotes.json` is generated — never edit it by hand.**
 
-| File | Purpose |
-|---|---|
-| `quotes.template.json` | Empty skeleton. Copy to `quotes.json` to start. |
-| `quotes.sample.json` | Three fictional placeholder quotes. **Fails `quotelint` in shipping mode on purpose.** |
-| `quotes.json` | The real database. Not committed until it contains real, verified quotes. |
+```
+data/groups.csv   ─┐
+data/quotes.csv   ─┴─▶  quotelint build  ─▶  data/quotes.json  ─▶  app bundle
+```
 
-## Adding a quote
+## Working flow
 
-1. Copy the object shape from `quotes.sample.json`.
-2. `id` — `<group>-<member>-<0001>`, assigned once, never reused, never renumbered.
-3. `text` — English ≤ 220 chars, Chinese ≤ 110 chars.
-4. `shortText` — **required** if the quote is longer than 60 English / 30 Chinese characters,
-   because it is what the lock-screen widget renders.
-5. `source` — real title, real `yyyy-MM-dd`, real URL. No URL means no quote.
-6. `verified: true` — only after a second person clicked the link and confirmed the wording.
-7. Run `swift run quotelint data/quotes.json --mode development` until it is clean.
+```bash
+# 1. edit data/quotes.csv in Numbers / Excel / Google Sheets
+# 2. rebuild the JSON
+quotelint build
 
-## The gate
+# 3. see how each group is doing against the 60-quote gate
+quotelint --stats
 
-`swift run quotelint data/quotes.json --stats` shows per-group counts. A group ships at **60**
-active quotes; flagship groups at **200**. Under 60, fans see repeats inside two months and the
-reviews say so.
+# 4. check everything (also runs the core logic tests)
+./scripts/check.sh
+```
+
+While curating, use the relaxed rules so placeholder rows do not block you:
+
+```bash
+quotelint build --mode development --min 1
+```
+
+Before a release, drop the flags — `quotelint` then refuses to build if any quote is unverified,
+missing Chinese, missing a source URL, or a group is under 60 quotes.
+
+On this machine `swift run` does not work (broken Command Line Tools), so use the binary built by
+`./scripts/check.sh`:
+
+```bash
+.localbuild/quotelint build
+```
+
+## `groups.csv`
+
+| Column | Required | Notes |
+|---|---|---|
+| `id` | yes | lowercase, no spaces. `bts`, `aespa`. Never change once quotes reference it. |
+| `name_en` | yes | |
+| `name_zh` | strongly | Simplified Chinese |
+| `name_zh_hant` | optional | Traditional Chinese; falls back to `name_zh` |
+| `debut` | optional | year |
+| `accent` | optional | hex colour used to theme that group's widget |
+
+## `quotes.csv`
+
+| Column | Required | Notes |
+|---|---|---|
+| `id` | yes | `<group>-<member>-<0001>`. Assigned once, never reused, never renumbered. |
+| `group_id` | yes | must exist in `groups.csv` |
+| `member_id` | yes | stable slug for the member |
+| `member_en` | yes | display name |
+| `member_zh` | strongly | |
+| `text_en` | yes | ≤ 220 characters |
+| `text_zh` | strongly | ≤ 110 characters |
+| `short_en` | **if long** | required when `text_en` > 60 chars — this is what the lock screen shows |
+| `short_zh` | **if long** | required when `text_zh` > 30 chars |
+| `context_en` / `context_zh` | optional | one line of "where this was said" |
+| `source_title` | yes | e.g. `Weverse Live`, `Vogue Korea interview` |
+| `source_date` | yes | `yyyy-mm-dd` — **format the cell as plain text**, not a date |
+| `source_url` | yes | no URL means no quote |
+| `lang` | optional | original language: `ko`, `en`, `ja`, `zh`. Default `ko`. |
+| `tags` | optional | `comfort; funny; hype` (semicolons or commas) |
+| `verified` | yes | `TRUE` only after a second person clicked the link |
+| `retired` | optional | `TRUE` to pull a quote without deleting the row |
+| `notes` | optional | your own notes; ignored by the build |
+
+`*_zh_hant` columns are supported if present, and are optional in v1.
+
+## Rules the build enforces
+
+- Every quote needs `verified = TRUE` and a `source_url`.
+- Every quote needs Chinese text.
+- `text_en` ≤ 220 chars, `text_zh` ≤ 110 chars.
+- A quote longer than 60 EN / 30 ZH chars **must** have `short_en` / `short_zh`.
+- No duplicate ids. No duplicate text within the same group (the same line attributed to two
+  members is the classic embarrassing mistake).
+- A group needs 60 active quotes to ship.
+- Any id starting with `sample-` blocks a shipping build.
 
 ## Removing a quote
 
-Set `"retired": true`. Never delete. Deleting rewrites history in the diff and loses the audit trail
-that proves where the quote came from.
+Set `retired = TRUE`. Do not delete the row — the diff and the sourcing trail are the audit evidence
+that the quote was real.
 
-## Why shortText matters
+## Why `short_en` matters more than it looks
 
-The lock-screen widget has roughly one line. A quote without `shortText` simply cannot appear there.
-`quotelint` treats a missing `shortText` on a long quote as an error, not a warning.
+The lock-screen widget has roughly one line of space. A quote without a short version simply cannot
+appear there, which means the Pro feature people care about most goes unused for that quote.

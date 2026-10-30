@@ -58,12 +58,12 @@ instead of never. The "aesthetic" comes from typography and generated gradients,
 
 - [x] Concept + decisions locked
 - [x] Spec written
-- [x] **`BiasCore` implemented and verified — 26 checks passing** (`./scripts/check.sh`)
-- [x] Content linter (`quotelint`) working locally without Xcode
+- [x] **`BiasCore` implemented and verified — 34 checks passing** (`./scripts/check.sh`)
+- [x] Content pipeline: `groups.csv` + `quotes.csv` → `quotes.json`, with a linter that refuses bad content
 - [ ] iOS app targets (`project.yml` + SwiftUI views) — next
 - [ ] Widget extension
 - [ ] CI pipeline on GitHub Actions
-- [ ] Content curation (the long pole — start this in parallel)
+- [ ] Content curation (the long pole — you can start now)
 - [ ] Apple Developer Program enrolment
 - [ ] TestFlight → App Store
 
@@ -73,16 +73,17 @@ instead of never. The "aesthetic" comes from typography and generated gradients,
 ./scripts/check.sh
 ```
 
-Compiles `BiasCore` + `quotelint` with `swiftc` and runs 26 checks covering the daily rotation,
-length budgets, localisation fallback, source validation, theme contrast, and the content rules.
-No Xcode required.
+Compiles `BiasCore` + `quotelint` with `swiftc` and runs 34 checks covering the daily rotation,
+CSV parsing, the importer, length budgets, localisation fallback, theme contrast, and the content
+rules. No Xcode required.
 
 ```
-swift run quotelint data/quotes.json --stats
+.localbuild/quotelint build          # data/*.csv  ->  data/quotes.json
+.localbuild/quotelint build --mode development --min 1     # while curating
+.localbuild/quotelint --stats        # per-group counts against the 60-quote gate
 ```
 
-Per-group content counts against the 60-quote gate. (Needs SwiftPM, which works in CI but not on
-this machine.)
+Start curating by editing `data/quotes.csv`. See `data/README.md` for the column reference.
 
 ## ⚠️ Blocker found: this Mac cannot build the app
 
