@@ -42,8 +42,8 @@ struct QuoteWidgetContent: View {
 
     private var padding: CGFloat {
         switch family {
-        case .systemSmall: return 12
-        case .systemMedium: return 16
+        case .small: return 12
+        case .medium: return 16
         case .accessoryRectangular: return 6
         case .accessoryInline: return 0
         }
