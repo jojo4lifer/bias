@@ -1,15 +1,5 @@
 name: CI
 
-# This machine cannot build the app: macOS 12.7.6 caps Xcode at 14.2 (iOS 16.2 SDK) and the
-# Command Line Tools are missing PackageDescription.swiftmodule, so SwiftPM cannot even run here.
-# CI is therefore the compiler of record.
-#
-# What this proves on every push:
-#   1. BiasCore logic checks pass
-#   2. the quote database validates
-#   3. data/quotes.json actually matches data/groups.csv + data/quotes.csv
-#   4. the Xcode project generates and both targets compile
-
 on:
   push:
   pull_request:
@@ -20,31 +10,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  verify:
-    runs-on: macos-15
-    timeout-minutes: 30
-
+  # Runs on Linux, starts instantly, and catches most real mistakes.
+  checks:
+    name: logic + content
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
       - name: Toolchain
-        run: |
-          xcodebuild -version
-          swift --version
-
-      - name: Cache SwiftPM build
-        uses: actions/cache@v4
-        with:
-          path: .build
-          key: ${{ runner.os }}-spm-${{ hashFiles('Package.swift') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-
+        run: swift --version
 
       - name: Core self-checks
         run: swift run quotelint self-check
 
       - name: Validate content
-        # Development rules on purpose: data/quotes.json still contains the placeholder row, and a
+        # Development rules on purpose: data/quotes.json still holds the placeholder row, so a
         # shipping-mode lint must keep failing until real quotes replace it.
         run: swift run quotelint --mode development --min 1 --stats
 
@@ -52,6 +33,21 @@ jobs:
         run: |
           swift run quotelint build --mode development --min 1 --out "$RUNNER_TEMP/quotes.generated.json" > /dev/null
           diff -u data/quotes.json "$RUNNER_TEMP/quotes.generated.json"
+
+  # macOS runners are free but heavily contended. Anything that can run on Linux is kept out of
+  # this job so a queue stall never hides a logic failure.
+  build:
+    name: ios build
+    needs: checks
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
 
       - name: Install XcodeGen
         run: brew install xcodegen
