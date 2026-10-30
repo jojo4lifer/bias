@@ -1,24 +1,13 @@
 import SwiftUI
-import WidgetKit
 import BiasCore
 
-/// The real widget. Wraps the shared content with the theme background.
-struct QuoteWidgetView: View {
-    @Environment(\.widgetFamily) private var family
-    let entry: QuoteWidgetEntry
-
-    var body: some View {
-        QuoteWidgetContent(entry: entry, family: family.kind)
-            .containerBackground(for: .widget) { entry.theme.gradient }
-    }
-}
-
-/// The widget's actual content, independent of WidgetKit.
+/// The widget's content, independent of WidgetKit.
 ///
-/// Used by both the widget extension and the in-app preview screen, so what you see in the preview
-/// is what lands on someone's Home Screen. The widget disables system content margins
-/// (`contentMarginsDisabled()`) so this padding is the only padding — otherwise the preview and the
-/// real widget would diverge.
+/// No `import WidgetKit` on purpose: this is the part that decides what a fan actually reads, so it
+/// must be verifiable without an iOS SDK. `QuoteWidgetView` in the widget target wraps it.
+///
+/// The widget disables system content margins (`contentMarginsDisabled()`), so the padding here is
+/// the only padding — which keeps the in-app preview pixel-honest.
 struct QuoteWidgetContent: View {
     let entry: QuoteWidgetEntry
     let family: WidgetFamilyKind

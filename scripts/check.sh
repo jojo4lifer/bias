@@ -28,12 +28,23 @@ echo "── self-checks ──"
 "$LINT" self-check
 
 echo
-echo "── syntax-check the app and widget sources ──"
-# `-parse` checks syntax only. No SwiftUI module and no Xcode required. It cannot catch type
-# errors — only CI can — but it does catch unbalanced braces, bad expressions and typos in structure.
-find "$ROOT/BiasApp" "$ROOT/BiasWidgets" "$ROOT/Shared" -name '*.swift' -print0 \
-  | xargs -0 swiftc -parse
-echo "ok: app + widget sources parse"
+echo "── type-check the app (macOS SDK, no Xcode) ──"
+# The macOS SDK ships SwiftUI, so anything that does not use iOS-17-only APIs can be type-checked
+# right here. That covers BiasCore, the shared views, TodayView and the preview screen. Only the
+# thin WidgetKit bridge in BiasWidgets/ is left to CI.
+TC="$BUILD/typecheck"
+mkdir -p "$TC"
+cp "$ROOT"/Sources/BiasCore/*.swift "$TC/"
+cp "$ROOT"/Shared/ThemeStyle.swift "$ROOT"/Shared/QuoteWidgetEntry.swift "$ROOT"/Shared/QuoteWidgetContent.swift "$TC/"
+find "$ROOT/BiasApp" -name '*.swift' -exec cp {} "$TC/" \;
+sed -i '' 's/^import BiasCore$//' "$TC"/*.swift
+swiftc -typecheck -sdk "$(xcrun --show-sdk-path)" -target x86_64-apple-macosx12.0 "$TC"/*.swift
+echo "ok: app type-checks against the macOS SDK"
+
+echo
+echo "── syntax-check the widget target (WidgetKit, CI-only) ──"
+find "$ROOT/BiasWidgets" -name '*.swift' -print0 | xargs -0 swiftc -parse
+echo "ok: widget sources parse"
 
 echo
 echo "── build quotes.json from CSV ──"
