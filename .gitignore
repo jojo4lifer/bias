@@ -8,6 +8,9 @@
 # XcodeGen output — project.yml is the source of truth, never commit the generated project
 *.xcodeproj
 *.xcworkspace
+# ...and the Info.plists XcodeGen writes from project.yml
+BiasApp/Info.plist
+BiasWidgets/Info.plist
 
 # Xcode user state
 xcuserdata/

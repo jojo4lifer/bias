@@ -28,6 +28,14 @@ echo "── self-checks ──"
 "$LINT" self-check
 
 echo
+echo "── syntax-check the app and widget sources ──"
+# `-parse` checks syntax only. No SwiftUI module and no Xcode required. It cannot catch type
+# errors — only CI can — but it does catch unbalanced braces, bad expressions and typos in structure.
+find "$ROOT/BiasApp" "$ROOT/BiasWidgets" "$ROOT/Shared" -name '*.swift' -print0 \
+  | xargs -0 swiftc -parse
+echo "ok: app + widget sources parse"
+
+echo
 echo "── build quotes.json from CSV ──"
 cd "$ROOT"
 "$LINT" build \

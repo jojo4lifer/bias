@@ -60,9 +60,10 @@ instead of never. The "aesthetic" comes from typography and generated gradients,
 - [x] Spec written
 - [x] **`BiasCore` implemented and verified — 34 checks passing** (`./scripts/check.sh`)
 - [x] Content pipeline: `groups.csv` + `quotes.csv` → `quotes.json`, with a linter that refuses bad content
-- [ ] iOS app targets (`project.yml` + SwiftUI views) — next
-- [ ] Widget extension
-- [ ] CI pipeline on GitHub Actions
+- [x] Widget extension (all four families) + Today screen — written, syntax-checked, **not yet compiled**
+- [x] `project.yml` (XcodeGen) + `.github/workflows/ci.yml`
+- [ ] First CI run — needs the repo pushed to GitHub
+- [ ] Onboarding, archive, share cards, paywall
 - [ ] Content curation (the long pole — you can start now)
 - [ ] Apple Developer Program enrolment
 - [ ] TestFlight → App Store
@@ -84,6 +85,40 @@ rules. No Xcode required.
 ```
 
 Start curating by editing `data/quotes.csv`. See `data/README.md` for the column reference.
+
+## Getting CI running (needed to compile anything)
+
+There is a local git repo with two commits but **no remote yet**. The Xcode project cannot be built
+on this machine, so the first CI run is the first time the app will ever be compiled.
+
+```bash
+# 1. create an empty public repo on GitHub, then:
+git remote add origin git@github.com:<you>/<repo>.git
+git branch -M main
+git push -u origin main
+
+# 2. watch it: GitHub -> Actions -> CI
+```
+
+Expected first-run outcomes, so nothing surprises you:
+
+- `project.yml` may need a fix (it has never been through `xcodegen generate`).
+- The SwiftUI/widget code may need type fixes — only syntax was checked locally.
+- Everything in `BiasCore` and the content pipeline should pass first time.
+
+## Repo layout
+
+| Path | What |
+|---|---|
+| `Sources/BiasCore/` | Foundation-only engine: rotation, models, themes, validation. Locally testable. |
+| `Sources/QuoteLint/` | The `quotelint` CLI |
+| `BiasApp/` | SwiftUI app |
+| `BiasWidgets/` | WidgetKit extension |
+| `Shared/` | SwiftUI code compiled into both app and widget |
+| `data/` | `groups.csv`, `quotes.csv` (source of truth) and generated `quotes.json` |
+| `docs/` | Product spec, tech spec, content/legal guide, launch plan |
+| `project.yml` | XcodeGen manifest — the project's source of truth |
+| `scripts/check.sh` | Everything that can be verified without Xcode |
 
 ## ⚠️ Blocker found: this Mac cannot build the app
 
