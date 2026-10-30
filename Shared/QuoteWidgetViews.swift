@@ -26,14 +26,14 @@ struct QuoteWidgetContent: View {
     var body: some View {
         Group {
             switch family {
-            case .accessoryInline:
-                inline
+            case .small:
+                small
+            case .medium:
+                medium
             case .accessoryRectangular:
                 rectangular
-            case .systemSmall:
-                small
-            case .systemMedium:
-                medium
+            case .accessoryInline:
+                inline
             }
         }
         .padding(padding)

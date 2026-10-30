@@ -28,6 +28,7 @@ extension WidgetFamily {
         case .systemSmall: return .small
         case .systemMedium: return .medium
         case .systemLarge: return .medium
+        case .systemExtraLarge: return .medium
         case .accessoryRectangular: return .accessoryRectangular
         case .accessoryInline: return .accessoryInline
         case .accessoryCircular: return .accessoryInline
