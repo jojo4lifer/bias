@@ -1,0 +1,377 @@
+# Technical Spec
+
+## 1. Stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| UI | SwiftUI | Fastest path for a small app |
+| Widgets | WidgetKit | Required |
+| Min iOS | **17.0** | Covers the overwhelming majority of active iPhones in 2026; gives `ContentUnavailableView`, `@Observable`, modern navigation |
+| Purchases | **StoreKit 2** | No server needed; `Transaction.currentEntitlements` is the source of truth |
+| Data | Bundled JSON + `Codable` | No backend, no accounts, works offline, trivial review story |
+| Persistence | `UserDefaults` (App Group) for prefs; no database needed |
+| Localization | String Catalog (`.xcstrings`) | Single file, supports `zh-Hans` / `zh-Hant` |
+| Images | None | All visuals are gradients + text. Binary stays tiny, zero asset copyright risk |
+
+**No server in v1.** This is a feature: no hosting cost, no privacy surface, no sync bugs, and the
+widget never shows an error state.
+
+## 2. Targets
+
+```
+BiasApp          (iOS app)
+BiasWidgets      (widget extension)
+BiasShared       (shared framework/package: models, rotation, themes, loader)
+```
+
+App Group: `group.com.<team>.bias` — shared `UserDefaults` only. Quote JSON is bundled into *both*
+targets (see §4).
+
+## 3. File tree
+
+```
+App1/
+├── README.md
+├── docs/
+├── Bias.xcodeproj
+├── BiasApp/
+│   ├── App/
+│   │   └── BiasApp.swift
+│   ├── Onboarding/
+│   │   ├── OnboardingFlow.swift
+│   │   ├── GroupPickerView.swift
+│   │   └── ThemePickerView.swift
+│   ├── Today/
+│   │   ├── TodayView.swift
+│   │   └── QuoteCardView.swift
+│   ├── Archive/
+│   │   ├── ArchiveView.swift
+│   │   └── QuoteDetailView.swift
+│   ├── Share/
+│   │   ├── ShareComposer.swift
+│   │   └── ShareCardRenderer.swift      // ImageRenderer, 3:4 and 9:16
+│   ├── Paywall/
+│   │   ├── PaywallView.swift
+│   │   └── Entitlements.swift           // @Observable StoreKit 2 store
+│   ├── Settings/
+│   │   └── SettingsView.swift
+│   └── Resources/
+│       ├── quotes.json
+│       ├── Localizable.xcstrings
+│       └── Assets.xcassets              // app icon only
+├── BiasWidgets/
+│   ├── BiasWidgetBundle.swift
+│   ├── DailyQuoteProvider.swift
+│   ├── QuoteSmallView.swift
+│   ├── QuoteMediumView.swift
+│   └── LockScreenViews.swift
+└── BiasCore/                      ← SwiftPM package, Foundation-only, NO SwiftUI
+    ├── Package.swift
+    ├── Sources/BiasCore/
+    │   ├── Models.swift               // Quote, QuoteGroup, QuoteSource, QuoteDatabase
+    │   ├── LocalizedText.swift        // resolution + fallback chain
+    │   ├── QuoteStore.swift           // load + index quotes.json
+    │   ├── DailyRotator.swift         // the deterministic cycle pick
+    │   ├── StableHash.swift           // FNV-1a + SplitMix64
+    │   ├── DayKey.swift               // local-midnight day boundaries
+    │   ├── DayNumber.swift            // Julian day, pure integer math
+    │   ├── QuoteLength.swift          // per-widget-family text budgets
+    │   ├── Theme.swift                // 10 procedural themes + WCAG contrast
+    │   ├── QuoteValidator.swift       // the content rules, as code
+    │   └── SelfChecks.swift           // the test suite
+    └── Sources/QuoteLint/main.swift   // `quotelint` CLI
+```
+
+`BiasCore` is Foundation-only on purpose: it makes the logic testable on a machine with no Xcode,
+and it keeps the app and the widget extension sharing one implementation of the rotation rule.
+
+**Current state:** `BiasCore`, `QuoteLint` and `scripts/check.sh` exist and pass (26 checks).
+Everything above `BiasWidgets` is not written yet — the Xcode app targets come next, behind
+`project.yml` (XcodeGen) because this machine cannot run Xcode.
+
+## 4. Data model
+
+`quotes.json` (bundled, ships with the binary):
+
+```jsonc
+{
+  "version": 3,
+  "generatedAt": "2026-10-31",
+  "groups": [
+    {
+      "id": "bts",
+      "name":   { "en": "BTS",   "zhHans": "防弹少年团", "zhHant": "防彈少年團" },
+      "debut":  2013,
+      "accent": "#7B5CFA"
+    }
+  ],
+  "quotes": [
+    {
+      "id": "bts-jk-0001",
+      "groupId": "bts",
+      "memberId": "jungkook",
+      "memberName": { "en": "Jungkook", "zhHans": "田柾国", "zhHant": "田楨國" },
+      "text": {
+        "en": "You worked hard today too, so you can be proud of yourself.",
+        "zhHans": "今天也辛苦了，所以你可以为自己感到骄傲。"
+      },
+      "shortText": { "en": "You worked hard today too.", "zhHans": "今天也辛苦了。" },   // optional, required if text > 60 chars
+      "context": { "en": "Said during a Weverse livestream.", "zhHans": "在 Weverse 直播中提到。" },
+      "source": {
+        "title": "Weverse Live",
+        "date": "2021-05-21",
+        "url": "https://weverse.io/bts/live/1-1000000000"
+      },
+      "lang": "ko",                       // original language of the quote
+      "tags": ["comfort"],
+      "verified": true,
+      "retired": false
+    }
+  ]
+}
+```
+
+**Rules**
+- `id` is permanent and never reused.
+- `shortText` is required when `text` exceeds 60 characters (lock screen + small widget).
+- `verified: false` quotes must not ship. The build script fails on them.
+- `retired: true` quotes are excluded from the pool but stay in the file. Note that retiring changes
+  `N`, which shifts the cycle grid — so retire only when a quote must actually come down (see the
+  takedown plan), not for tidying.
+- Group `accent` drives per-group theming.
+
+### Quote length contract
+
+| Field | Max chars (EN) | Max chars (ZH) | Used by |
+|---|---|---|---|
+| `shortText` | 60 | 30 | `accessoryInline`, `accessoryRectangular` |
+| `text` | 220 | 110 | `systemSmall`, `systemMedium`, archive, detail |
+
+A quote that cannot fit `systemMedium` is a bad quote. Cut it in curation, not in code.
+
+## 5. Daily rotation
+
+**Implemented and verified.** Source of truth: `Sources/BiasCore/DailyRotator.swift`; 11 checks in
+`Sources/BiasCore/SelfChecks.swift` cover it.
+
+```swift
+public enum DailyRotator {
+    public static func quote(for groupId: String, dayKey: String, in pool: [Quote]) -> Quote? {
+        guard let dayNumber = DayNumber(dayKey: dayKey) else { return nil }   // Julian day, integer math
+        let active = pool.filter { $0.groupId == groupId && !$0.retired }.sorted { $0.id < $1.id }
+        guard !active.isEmpty else { return nil }
+
+        let cycleLength = active.count
+        let cycleIndex  = dayNumber.value / cycleLength
+        let position    = dayNumber.value % cycleLength
+
+        let order = permutation(count: cycleLength,
+                                seed: StableHash.fnv1a([groupId, String(cycleIndex)]))
+        return active[order[position]]
+    }
+}
+```
+
+Design notes, because two obvious alternatives are wrong here:
+
+- **`hash(group|date) % count` is wrong.** `count` changes whenever a quote is added, so publishing
+  ten new quotes reshuffles every day — including the timeline already sitting on a fan's Home
+  Screen. It also happily repeats a quote on consecutive days (~1/60 chance per day, which reads as
+  a bug).
+- **Rendezvous hashing is append-stable but repeats.** It fixes the reshuffle, but a fan hits a
+  duplicate within ~10 days by the birthday paradox, which is worse for a "new quote daily" product.
+- **Cycles win.** Seeded Fisher–Yates over the pool, one cycle per pool-length. No repeats until the
+  deck is exhausted, a different order each cycle, and no recursion (day 10 000 costs the same as
+  day 0).
+
+**Accepted trade-offs**
+
+| Trade-off | Impact | Fix if it bites |
+|---|---|---|
+| Cycle boundary can repeat last→first of next cycle, `1/N` | Rare, one day per ~2 months | Not worth the complexity |
+| Adding quotes changes `N`, shifting the grid | On update day, fans on different versions may see different lines | Ship all content updates with app releases; or add a static `today.json` override (v1.1) |
+
+**Do not use `Swift.Hasher`** — it is randomly seeded per process, so the widget and the app would
+disagree and the quote would change on every launch. FNV-1a over UTF-8 and SplitMix64 are both
+implemented in `StableHash.swift` and tested against known vectors.
+
+Timezone: use the device's current calendar/timezone. A traveller crossing timezones will see the
+quote change early; acceptable, and preferable to locking to a server timezone.
+
+## 6. WidgetKit
+
+```swift
+struct DailyQuoteProvider: TimelineProvider {
+    func timeline(in context: Context) -> Timeline<QuoteEntry> {
+        var entries: [QuoteEntry] = []
+        let now = Date()
+        let startOfToday = Calendar.current.startOfDay(for: now)
+        for offset in 0..<10 {                       // 10 days of pre-computed entries
+            let day = Calendar.current.date(byAdding: .day, value: offset, to: startOfToday)!
+            entries.append(QuoteEntry(date: day, quote: rotator.quote(for: selectedGroup, on: day)))
+        }
+        return Timeline(entries: entries, policy: .after(startOfToday.addingTimeInterval(10 * 86400)))
+    }
+}
+```
+
+**Key points**
+- Pre-generate **10 daily entries**. Never rely on the widget refreshing on its own — the daily
+  budget (~40–70 refreshes/day) is not guaranteed.
+- `.atEnd` / `reloadTimelines` only when the user changes group, theme, or language.
+- Editing the widget (`AppIntentConfiguration`) lets users pick *which group* per widget instance —
+  and lets one user show BTS on the Home Screen and aespa on the lock screen. Ship this: it is the
+  single best Pro justification. Requires an `AppIntent` for group selection.
+- Theme is read from App Group `UserDefaults`; guard against the widget running before the app has
+  written anything (fall back to the group's `accent`).
+
+## 7. StoreKit 2
+
+| Product ID | Type | Price |
+|---|---|---|
+| `com.<team>.bias.pro.monthly` | Auto-renewable, 1 month | ¥9.90 (nearest available point) |
+| `com.<team>.bias.pro.lifetime` | Non-consumable | ¥68 |
+
+```swift
+@Observable final class Entitlements {
+    var isPro = false
+    func refresh() async { /* iterate Transaction.currentEntitlements, revoke expired */ }
+    func listen() { /* Task { for await update in Transaction.updates { ... } } }
+}
+```
+
+- **Never hardcode prices.** Always render `product.displayPrice`. ¥9.90 may not be a valid price
+  point; pick the nearest in App Store Connect.
+- Group the two products in one subscription group only if they were both subscriptions. They are
+  not — lifetime is a separate non-consumable. Present them as one paywall anyway.
+- Restore button is **mandatory** in review for both products.
+- Terms + Privacy links are **mandatory** on the paywall screen. Apple rejects subscription paywalls
+  without them (Guideline 3.1.2).
+- Because there is no account, entitlement lives on the Apple ID. Switching Apple IDs loses Pro —
+  document this in Settings honestly.
+
+### Review notes to paste into App Store Connect
+
+> This app displays short, attributed quotations from public statements made by musical artists,
+> together with a link to the original public source for each quote. Quotations are limited to
+> short excerpts for commentary and fan-reference purposes. The app contains no photographs,
+> artwork, logos, or audio belonging to any artist or agency, and does not imply affiliation with,
+> sponsorship by, or endorsement from any artist, group, or agency. Group and member names are used
+> only to identify the speaker of each quotation.
+
+## 8. Themes (procedural)
+
+`Theme` = name + a `ShapeStyle` recipe + typography pair + contrast mode.
+
+```swift
+struct Theme: Identifiable {
+    let id: String
+    let name: LocalizedStringKey
+    let gradient: [Color]        // 2–3 stops
+    let angleDegrees: Double
+    let isDark: Bool             // decides text color
+    let fontDesign: Font.Design  // .serif / .rounded / .default
+}
+```
+
+Ten themes, e.g. `midnight`, `dusk`, `paper`, `static`, `bloom`, `noir`, `sorbet`, `mono`,
+`neon`, `pressed`. All render from `LinearGradient`/`MeshGradient` (iOS 18) with a
+`LinearGradient` fallback. **No image assets** — keeps binary under a few MB and removes an entire
+class of copyright risk.
+
+Free themes: `midnight`, `paper`. Pro: the rest.
+
+## 9. Share card
+
+```swift
+let renderer = ImageRenderer(content: ShareCard(quote: q, theme: t).frame(width: 1080, height: 1440))
+renderer.scale = 1
+guard let ui = renderer.uiImage else { return }
+```
+
+- 3:4 (1080×1440) for Xiaohongshu, 9:16 (1080×1920) for IG Stories / status.
+- Small app handle bottom-right, ~40% opacity, on every card.
+- Render off-main-thread in a detached task for large sizes.
+- Add `ImageRenderer` output to the activity sheet via `ShareLink(item: Image(uiImage:))` after
+  writing to a temp file (more reliable than passing `UIImage` directly).
+
+## 10. Notifications
+
+One optional daily local notification (`UNCalendarNotificationTrigger`, repeats: true), body =
+first 60 chars of today's quote. Off by default. Request permission only when the user turns the
+toggle on — never on launch. A denied permission is unrecoverable.
+
+## 11. Privacy
+
+- No analytics, no accounts, no network calls in v1.
+- App Store privacy label: **Data Not Collected**.
+- No `NSUserTrackingUsageDescription` — we never call `ATTrackingManager`.
+- If analytics are added in v1.1, use a privacy-friendly SDK (e.g. TelemetryDeck) that needs no ATT
+  prompt, and update the privacy label.
+
+## 12. Build order
+
+1. `BiasShared` — models, loader, rotator + a unit test proving the same group+date always yields the
+   same quote, and that appending quotes does not change past picks.
+2. Static `Today` screen with 5 hardcoded quotes.
+3. `quotes.json` loader + group picker onboarding.
+4. Widget extension (small + medium), with App Intent group selection.
+5. Archive + favorites.
+6. Themes.
+7. Share card renderer.
+8. StoreKit 2 + paywall.
+9. Lock screen widgets.
+10. Localization pass (`en`, `zh-Hans`).
+11. Polish, icon, screenshots, TestFlight.
+
+## 12b. Build pipeline (no Xcode locally)
+
+The dev machine is a MacBook Air (Early 2015) capped at macOS 12.7.6, which supports Xcode 14.2 at
+best (iOS 16.2 SDK), and its Command Line Tools install is missing `PackageDescription.swiftmodule`
+so SwiftPM cannot even compile a manifest. **App Store submissions require a current Xcode/iOS 18
+SDK.** The app therefore cannot be built or submitted on this machine, ever.
+
+The workaround, which is the plan of record until a modern Mac exists:
+
+```
+local                              GitHub Actions (macos-15, Xcode 16)
+─────                              ────────────────────────────────────
+swiftc, one module                 xcodegen generate
+./scripts/check.sh  (26 checks)    swift test
+                                   xcodebuild -scheme BiasApp \
+                                     -destination 'generic/platform=iOS' \
+                                     CODE_SIGNING_ALLOWED=NO build
+git push ───────────────────────▶  on tag: archive + export + upload to TestFlight
+```
+
+Rules that follow from this:
+
+1. **`project.yml` is the source of truth, not `.xcodeproj`.** The project is generated by XcodeGen
+   in CI. `.xcodeproj` is gitignored. Never hand-edit project settings.
+2. **`BiasCore` stays Foundation-only.** It is the only code that can be verified locally, so as much
+   logic as possible belongs there and not in views.
+3. **Every push must compile.** The feedback loop is 5–8 minutes, so land small commits.
+4. **Signing is deferred.** Until the Apple Developer account exists, CI runs with
+   `CODE_SIGNING_ALLOWED=NO`, which still proves the app compiles and links. Nothing can be installed
+   on a device or sent to TestFlight before the account exists.
+5. **Secrets live only in GitHub Secrets**, never in the repo: `ASC_KEY_ID`, `ASC_ISSUER_ID`,
+   `ASC_PRIVATE_KEY` (contents of the `.p8`). Never commit the `.p8` file.
+
+Recommended: a **public repo**, because macOS runners are free for public repositories. With a
+private repo the free plan gives 2 000 minutes × a 10× macOS multiplier ≈ 200 real minutes/month —
+about 25 builds.
+
+Honest assessment: this is a viable way to *ship* once, and a frustrating way to *develop* an app
+whose entire value is visual. Widget layout, gradients, and typography cannot be judged without a
+simulator. The first money spent on this project should be a Mac mini.
+
+## 13. Technical risks
+
+| Risk | Mitigation |
+|---|---|
+| Widget shows stale or blank content | 10-day pre-generated timeline; bundle all content; no network path in the widget at all |
+| Rotator instability across versions | FNV-1a, append-only lists, `retired` flag, unit tests |
+| Review rejection 5.2.1 | No imagery; short attributed excerpts; source links; explicit review notes; disclaimer in-app |
+| Review rejection 3.1.2 | Terms/Privacy links on paywall, restore button, clear renewal language |
+| Translation quality | Human review pass on every `zh-Hans` string; never ship machine output unread |
+| Low quote count per group → repetition | Hard gate: ≥60 quotes per group; ≥200 for flagship groups |

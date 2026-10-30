@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-31",
+  "groups": [
+    {
+      "id": "demo-one",
+      "name": { "en": "Demo Group One", "zhHans": "示例组合一" },
+      "debut": 2013,
+      "accent": "#7B5CFA"
+    },
+    {
+      "id": "demo-two",
+      "name": { "en": "Demo Group Two", "zhHans": "示例组合二" },
+      "debut": 2020,
+      "accent": "#B05CFA"
+    }
+  ],
+  "quotes": [
+    {
+      "id": "sample-demo-one-0001",
+      "groupId": "demo-one",
+      "memberId": "demo-member-1",
+      "memberName": { "en": "Demo Member One", "zhHans": "示例成员一" },
+      "text": {
+        "en": "PLACEHOLDER — this is not a real quote, it exists only so the app has something to render during development.",
+        "zhHans": "占位文字 — 这不是真实语录，只是为了开发时页面里有点东西。"
+      },
+      "shortText": {
+        "en": "PLACEHOLDER — not a real quote.",
+        "zhHans": "占位文字，非真实语录。"
+      },
+      "context": {
+        "en": "Fictional sample data. Delete before shipping.",
+        "zhHans": "虚构的示例数据，上线前请删除。"
+      },
+      "source": {
+        "title": "Placeholder Source",
+        "date": "2021-05-21",
+        "url": "https://example.com/placeholder/1"
+      },
+      "lang": "ko",
+      "tags": ["comfort"],
+      "verified": true,
+      "retired": false
+    },
+    {
+      "id": "sample-demo-one-0002",
+      "groupId": "demo-one",
+      "memberId": "demo-member-2",
+      "memberName": { "en": "Demo Member Two", "zhHans": "示例成员二" },
+      "text": {
+        "en": "PLACEHOLDER — a second fake line, short enough for the small widget to render without truncation.",
+        "zhHans": "占位文字 — 第二句假话，长度足够放进小组件。"
+      },
+      "shortText": {
+        "en": "PLACEHOLDER — second fake line.",
+        "zhHans": "占位文字，第二句。"
+      },
+      "source": {
+        "title": "Placeholder Source",
+        "date": "2022-03-04",
+        "url": "https://example.com/placeholder/2"
+      },
+      "lang": "en",
+      "tags": ["funny"],
+      "verified": true
+    },
+    {
+      "id": "sample-demo-two-0001",
+      "groupId": "demo-two",
+      "memberId": "demo-member-3",
+      "memberName": { "en": "Demo Member Three", "zhHans": "示例成员三" },
+      "text": {
+        "en": "PLACEHOLDER — a fake line belonging to the second demo group, so grouping and filtering can be tested.",
+        "zhHans": "占位文字 — 属于第二个示例组合的假语录，用来测试分组和筛选。"
+      },
+      "shortText": {
+        "en": "PLACEHOLDER — fake line, group two.",
+        "zhHans": "占位文字，组合二。"
+      },
+      "source": {
+        "title": "Placeholder Source",
+        "date": "2023-11-09",
+        "url": "https://example.com/placeholder/3"
+      },
+      "lang": "en",
+      "tags": ["hype"],
+      "verified": true
+    }
+  ]
+}

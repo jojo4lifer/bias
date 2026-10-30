@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "generatedAt": "2026-10-31",
+  "groups": [
+    {
+      "id": "group-a",
+      "name": { "en": "Group A", "zhHans": "组合甲" },
+      "debut": 2013,
+      "accent": "#7B5CFA"
+    }
+  ],
+  "quotes": []
+}

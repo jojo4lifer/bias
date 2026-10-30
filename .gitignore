@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# SwiftPM
+.build/
+.localbuild/
+
+# XcodeGen output — project.yml is the source of truth, never commit the generated project
+*.xcodeproj
+*.xcworkspace
+
+# Xcode user state
+xcuserdata/
+*.xcuserstate
+DerivedData/
+
+# Signing — must never be committed
+*.p8
+*.p12
+*.mobileprovision
+*.cer
+AuthKey_*.p8
+
+# The linter's local scratch
+*.log
