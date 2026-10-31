@@ -41,7 +41,9 @@ struct QuoteWidgetContent: View {
     // MARK: - Families
 
     private var small: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 0) {
+            Spacer(minLength: 0)
+
             Text(bodyText)
                 .font(.system(size: 12, weight: .semibold, design: entry.theme.swiftUIFontDesign))
                 .foregroundStyle(entry.theme.textColor)
@@ -59,7 +61,9 @@ struct QuoteWidgetContent: View {
     }
 
     private var medium: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
+            Spacer(minLength: 0)
+
             Text(bodyText)
                 .font(.system(size: 15, weight: .semibold, design: entry.theme.swiftUIFontDesign))
                 .foregroundStyle(entry.theme.textColor)
@@ -84,10 +88,12 @@ struct QuoteWidgetContent: View {
 
     private var rectangular: some View {
         VStack(alignment: .leading, spacing: 2) {
+            Spacer(minLength: 0)
             Text(bodyText)
                 .font(.system(size: 11, weight: .medium, design: entry.theme.swiftUIFontDesign))
                 .foregroundStyle(entry.theme.textColor)
                 .lineLimit(3)
+            Spacer(minLength: 0)
             Text(attribution)
                 .font(.system(size: 8))
                 .foregroundStyle(entry.theme.textColor.opacity(0.75))

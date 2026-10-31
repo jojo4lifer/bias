@@ -3,8 +3,9 @@ import BiasCore
 
 /// The hero screen: today's quote for the first group the fan follows.
 ///
-/// This is intentionally the smallest thing that proves the pipeline end to end — bundle loads,
-/// rotation picks, theme renders. Onboarding, archive, share cards and the paywall come next.
+/// Layout intent: a masthead, a vertically centred quote, and a footer. Centring the quote is what
+/// stops a short line from leaving a hole in the middle of the screen — the version that pinned the
+/// quote to the top and the credit to the bottom looked unfinished rather than minimal.
 struct TodayView: View {
     private let repository = QuoteRepository.shared
     private let theme = ThemeCatalog.default
@@ -13,14 +14,40 @@ struct TodayView: View {
     var body: some View {
         ZStack {
             theme.gradient.ignoresSafeArea()
-            content
-                .padding(28)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+
+            VStack(alignment: .leading, spacing: 0) {
+                header
+
+                Spacer(minLength: 20)
+
+                main
+
+                Spacer(minLength: 20)
+
+                footer
+            }
+            .padding(.horizontal, 28)
+            .padding(.top, 12)
+            .padding(.bottom, 24)
         }
     }
 
+    // MARK: - Sections
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text("TODAY")
+                .font(.caption2.weight(.bold))
+                .tracking(2.4)
+            Spacer(minLength: 12)
+            Text(dateLabel)
+                .font(.caption)
+        }
+        .foregroundStyle(theme.textColor.opacity(0.55))
+    }
+
     @ViewBuilder
-    private var content: some View {
+    private var main: some View {
         if let loadError = repository.loadError {
             VStack(alignment: .leading, spacing: 10) {
                 Text("Content is missing")
@@ -31,7 +58,12 @@ struct TodayView: View {
             }
             .foregroundStyle(theme.textColor)
         } else if let quote = quoteOfTheDay {
-            quoteCard(quote)
+            Text(quote.text.resolve(language))
+                .font(.system(size: 32, weight: .semibold, design: theme.swiftUIFontDesign))
+                .foregroundStyle(theme.textColor)
+                .lineSpacing(5)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
         } else {
             Text("No quote for today yet.")
                 .font(.body)
@@ -39,30 +71,30 @@ struct TodayView: View {
         }
     }
 
-    private func quoteCard(_ quote: Quote) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text(quote.text.resolve(language))
-                .font(.system(size: 28, weight: .semibold, design: theme.swiftUIFontDesign))
-                .foregroundStyle(theme.textColor)
-                .fixedSize(horizontal: false, vertical: true)
-
-            Spacer(minLength: 0)
-
-            VStack(alignment: .leading, spacing: 4) {
+    @ViewBuilder
+    private var footer: some View {
+        if let quote = quoteOfTheDay {
+            VStack(alignment: .leading, spacing: 5) {
                 Text(attribution(for: quote))
-                    .font(.system(size: 14, weight: .medium, design: theme.swiftUIFontDesign))
+                    .font(.system(size: 15, weight: .medium, design: theme.swiftUIFontDesign))
                 Text(quote.source.title)
                     .font(.system(size: 12))
-                    .opacity(0.65)
+                    .opacity(0.6)
             }
             .foregroundStyle(theme.textColor)
         }
     }
 
+    // MARK: - Data
+
     private func attribution(for quote: Quote) -> String {
         let groupName = repository.store.group(for: quote.groupId)?.name.resolve(language) ?? ""
         let memberName = quote.memberName.resolve(language)
         return groupName.isEmpty ? "— \(memberName)" : "— \(memberName), \(groupName)"
+    }
+
+    private var dateLabel: String {
+        Date().formatted(.dateTime.month(.wide).day())
     }
 
     private var quoteOfTheDay: Quote? {
